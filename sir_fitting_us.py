@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from eda import us_data
 from mass_pop_data import ma_county_pops
+from tx_pop_data import tx_county_pops
 from nyt_data import county_data
 # T = len(us_data['confirmed'])
 
@@ -632,6 +633,56 @@ def make_csv_from_ma_traj(traj, data, fname):
         }
     data_cols = ['Cases_Mean', 'Cases_LB', 'Cases_UB', 'Deaths_Mean', 'Deaths_LB', 'Deaths_UB']
     for county, county_pop in sorted(ma_county_pops.items()):
+        county_frac = county_pop / N
+        for col_name in data_cols:
+            col = data_dict[col_name]
+            county_col = round_to_int(col * county_frac)
+            county_col_name = county + "_" + col_name
+            data_dict[county_col_name] = county_col
+    df = pd.DataFrame(data_dict)
+    df.set_index('Date')
+    df.to_csv(fname, index=False)
+
+def make_csv_from_tx_traj(traj, data, fname):
+    N = data['pop']
+    T = 365
+    cases = [[] for _ in range(T)]
+    deaths = [[] for _ in range(T)]
+    for log_tunables, ll in tqdm(traj):
+        log_params, log_I0 = log_tunables[:-1], log_tunables[-1]
+        params, I0 = exp(log_params), exp(log_I0)
+        x0 = np.array([1 -I0, 0, I0, 0, 0])
+        sol = solve_seir(x0, params, end_time=T)
+        cases_idx = SEIR_VAR_NAMES.index('i')
+        deaths_idx = SEIR_VAR_NAMES.index('d')
+        num_cases = sol.y[cases_idx, :] * N
+        num_deaths = sol.y[deaths_idx, :] * N
+        for i in range(T):
+            cases[i].append(num_cases[i])
+            deaths[i].append(num_deaths[i])
+        # cases = [sorted(col) for col in cases]
+        # deaths = [sorted(col) for col in deaths]
+    cases_mean = [np.mean(col) for col in cases]
+    cases_2p5 = [np.percentile(col, 2.5) for col in cases]
+    cases_97p5 = [np.percentile(col, 97.5) for col in cases]
+    deaths_mean = [np.mean(col) for col in deaths]
+    deaths_2p5 = [np.percentile(col, 2.5) for col in deaths]
+    deaths_97p5 = [np.percentile(col, 97.5) for col in deaths]
+
+    start = 'Jan 22, 2020'
+    end = pd.to_datetime(start) + pd.Timedelta(days=(365 - 1))
+    date_range = pd.date_range(start=start, end=end)
+    data_dict = {
+        'Date': date_range,
+        'Cases_Mean': round_to_int(cases_mean),
+        'Cases_LB': (round_to_int(cases_2p5)),
+        'Cases_UB': (round_to_int(cases_97p5)),
+        'Deaths_Mean': (round_to_int(deaths_mean)),
+        'Deaths_LB': (round_to_int(deaths_2p5)),
+        'Deaths_UB': (round_to_int(deaths_97p5)),
+        }
+    data_cols = ['Cases_Mean', 'Cases_LB', 'Cases_UB', 'Deaths_Mean', 'Deaths_LB', 'Deaths_UB']
+    for county, county_pop in sorted(tx_county_pops.items()):
         county_frac = county_pop / N
         for col_name in data_cols:
             col = data_dict[col_name]

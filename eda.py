@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from mass_pop_data import ma_county_pops
+from tx_pop_data import tx_county_pops
 from us_states import US_STATES
 
 HIGH_PRIORITY_STATES = [
@@ -108,6 +109,14 @@ ma_data = {
     'deaths': deaths_df[is_MA][date_cols].values[0],
     #'recovered': np.array(recovered[('Massachusetts', 'US')]),
     'pop': sum(ma_county_pops.values())
+
+}
+is_TX = confirmed_df['Province/State'] == 'Texas'
+tx_data = {
+    'confirmed': confirmed_df[is_TX][date_cols].values[0],
+    'deaths': deaths_df[is_TX][date_cols].values[0],
+    #'recovered': np.array(recovered[('Massachusetts', 'US')]),
+    'pop': sum(tx_county_pops.values())
 
 }
 def plot_us():
